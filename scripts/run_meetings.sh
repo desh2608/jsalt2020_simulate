@@ -110,7 +110,7 @@ gen_filelist=$ROOTDIR/tools/gen_filelist.py
 list2json=$ROOTDIR/tools/list2json_librispeech.py
 mixspec=$ROOTDIR/tools/gen_mixspec_mtg.py
 mixer=$ROOTDIR/tools/mixaudio_mtg.py
-
+gen_cmd="queue.pl --mem 12G"
 # Directories
 set=$2
 if [ -v vad ]; then
@@ -127,7 +127,7 @@ if [ ! -v dyncfg ]; then
     dyncfg=$ROOTDIR/configs/common/meeting_dynamics.json
 fi
 
-# List the source files. 
+# # List the source files. 
 datalist=$tgtroot/${set}.list
 python $gen_filelist --srcdir $srcdir --outlist $datalist
 
@@ -164,5 +164,5 @@ else
     opts=''
 fi
 ${gen_cmd} JOB=1:${nj} ${splitdir}/log/mixlog.JOB.log \
-    python $mixer $opts --iolist ${splitdir}/mixspec.JOB.json --cancel_dcoffset --random_seed JOB --sample_rate 16000 --log ${splitdir}/mixlog.JOB.json --mixers_configfile $roomcfg
+   python $mixer $opts --iolist ${splitdir}/mixspec.JOB.json --cancel_dcoffset --random_seed JOB --sample_rate 16000 --log ${splitdir}/mixlog.JOB.json --mixers_configfile $roomcfg
 python $mergejson $(for j in $(seq ${nj}); do echo ${splitdir}/mixlog.${j}.json; done) > $mixlog

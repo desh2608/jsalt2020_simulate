@@ -48,7 +48,7 @@ def make_argparse():
                         help='Source directory. All files under this directory will be listed.')
     parser.add_argument('--outlist', metavar='<dir>', required=True,
                         help='Name of the output file listing the filenames of interest.')
-    parser.add_argument('--include_filter', nargs='*', metavar='<pattern str>', default=['*.wav', '*.WAV'],
+    parser.add_argument('--include_filter', nargs='*', metavar='<pattern str>', default=['*.wav', '*.WAV', '*.flac', '*.FLAC'],
                         help='File names that match one of these are included in the list. By default, only files with .wav or .WAV extensions are included.')
     parser.add_argument('--exclude_filter', nargs='*', metavar='<pattern str>', default=[], 
                         help='File names that match one of these are not included in the list. This is not used by default.')

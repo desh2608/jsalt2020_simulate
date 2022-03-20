@@ -6,6 +6,8 @@ set -e
 set -u
 set -o pipefail
 
+. ./path.sh
+
 
 function print_usage_and_exit {
     CMD=`basename $0`    
