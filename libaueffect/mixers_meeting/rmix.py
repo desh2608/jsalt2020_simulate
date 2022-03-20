@@ -36,7 +36,7 @@ class ReverbMixMeeting(object):
                 self._noise_generator = generator_pool[id]
 
 
-    def __call__(self, inputs, offsets, speaker_labels):
+    def __call__(self, inputs, offsets, speaker_labels, to_return=('image', 'noise')):
         # Determine the number of speakers. 
         spkrs = sorted(list(set(speaker_labels)))
         nspkrs = len(spkrs)
@@ -44,40 +44,69 @@ class ReverbMixMeeting(object):
         # Generate RIRs. 
         rir, rir_info = self._room_simulator(nspeakers=nspkrs, info_as_display_style=True)
 
-        spkr2rir = {spkr: i for i, spkr in enumerate(spkrs)}
+        spkr2idx = {spkr: i for i, spkr in enumerate(spkrs)}
         rir_info.append( ('speakers', spkrs) )
 
         # Remove the preceding delay. 
         rir = libaueffect.remove_delay_from_rirs(rir)
         nchans = rir[0].shape[0]
 
-        # Reverberate the source signals. 
+        # Reverberate each segment. 
         z = []
         for x, spkr in zip(inputs, speaker_labels):
-            h = rir[ spkr2rir[spkr] ]            
+            h = rir[ spkr2idx[spkr] ]            
             z.append( np.stack([scipy.signal.lfilter(h[j], 1, x) for j in range(nchans)]) )
 
         # Generate the mixture signals. 
         target_len = np.amax([dt.shape[1] + offset for dt, offset in zip(z, offsets)])
 
-        y = np.zeros((nchans, target_len))
-        for dt, offset in zip(z, offsets):
+        s = np.zeros((nspkrs, target_len))  # anechoic signals
+        u = np.zeros((nspkrs, nchans, target_len))  # source images
+
+        for dt, x, offset, spkr in zip(z, inputs, offsets, speaker_labels):
             gain = np.random.uniform(self._gain_range[0], self._gain_range[1])
-            scale = 10**(gain / 20)
-            y[:, offset : offset + dt.shape[1]] += scale * dt
-       
-        # Generage noise. 
+            gain = 10**(gain / 20)
+            s[spkr2idx[spkr], offset : offset + x.shape[0]] += x * gain
+            u[spkr2idx[spkr], :, offset : offset + dt.shape[1]] += gain * dt
+
+        # # Time-shift and concatenate the utterances of each speaker. 
+        # target_len = np.amax([dt.shape[1] + offset for dt, offset in zip(z, offsets)])
+        # u = np.zeros((nspkrs, target_len))
+
+        # for x, offset, spkr in zip(inputs, offsets, speaker_labels):
+        #     # Randomly change the source amplitude. 
+        #     gain = np.random.uniform(self._gain_range[0], self._gain_range[1])
+        #     gain = 10**(gain / 20)
+        #     s[spkr2idx[spkr], offset : offset + x.shape[0]] += x * gain
+
+        # # Reverberate and mix the signals. 
+        # u = np.zeros((nspkrs, nchans, target_len))  # source images
+        # for spkr in spkrs:
+        #     spkr_idx = spkr2idx[spkr]
+        #     h = rir[spkr_idx]
+        #     for j in range(nchans):
+        #         u[spkr_idx, j] = scipy.signal.lfilter(h[j], 1, s[spkr_idx])
+
+        y = np.sum(u, axis=0)
+
+        # Generate noise. 
         if self._noise_generator is not None:
-            n = self._noise_generator(nsamples=target_len)
+            n = self._noise_generator(nsamples=target_len)                                                                                                                                                       
             n, snr = libaueffect.signals.scale_noise_to_random_snr(n, y, self._min_snr, self._max_snr)
 
             # Add the noise and normalize the resultant signal. 
-            y = y + n
+            y += n
+        else:
+            n = np.zeros((nchans, target_len))
 
-            # Normalize the generated signal. 
-            max_amplitude = np.amax(np.absolute(y))
-            scale = (32767/32768) / max_amplitude
-            y *= scale
+        # Normalize the generated signal. 
+        max_amplitude = np.amax(np.absolute(y))
+        scale = (32767/32768) / max_amplitude * 0.3
+        y *= scale
+        n *= scale
+        u *= scale
+        for h in rir:
+            h *= scale
 
         # description of the mixing process
         params = [('mixer', self.__class__.__name__),
@@ -86,4 +115,32 @@ class ReverbMixMeeting(object):
         if self._noise_generator is not None:
             params.append( ('snr', snr) )
 
-        return y, OrderedDict(params)
+        # intermediate signals
+        interm = {}
+        for wanted in to_return:
+            if wanted == 'image':
+                data = {}
+                for spkr in spkrs:
+                    name = f'{wanted}{spkr}'
+                    data[name] = u[spkr2idx[spkr]]
+                interm[wanted] = data
+
+            elif wanted == 'noise':
+                data = {wanted: n}
+                interm[wanted] = data
+
+            elif wanted == 'rir':
+                data = {}
+                for spkr in spkrs:
+                    name = f'{wanted}{spkr}'
+                    data[name] = rir[spkr2idx[spkr]]
+                interm[wanted] = data
+
+            elif wanted == 'source':
+                data = {}
+                for spkr in spkrs:
+                    name = f'{wanted}{spkr}'
+                    data[name] = s[spkr2idx[spkr]]
+                interm[wanted] = data
+
+        return y, OrderedDict(params), interm
