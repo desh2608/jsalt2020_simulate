@@ -6,6 +6,8 @@ set -e
 set -u
 set -o pipefail
 
+. ./path.sh
+
 
 function print_usage_and_exit {
     CMD=`basename $0`    
@@ -26,7 +28,7 @@ function print_usage_and_exit {
 }
 
 
-nj=16  # default parallel jobs
+nj=40  # default parallel jobs
 
 while [ $# -ge 1 ]
 do
@@ -69,14 +71,13 @@ export PATH=${KALDI_UTILS}:${PATH}
 . $ROOTDIR/configs/cmd.sh
 
 # Scripts
-deflac=$ROOTDIR/tools/deflac.py
 gen_filelist=$ROOTDIR/tools/gen_filelist.py
 segment=$ROOTDIR/tools/tight_segment.py
 
 
-srcdir=$EXPROOT/data-orig/LibriSpeech  # Has to contain train-clean100 and train-clean-360 from which FLAC files are retrieved. 
+srcdir=/export/corpora5/LibriSpeech  # Has to contain train-clean100 and train-clean-360 from which FLAC files are retrieved. 
 
-for set in train dev test 
+for set in train dev test
 do 
     dstdir=$EXPROOT/data/$set
 
@@ -95,18 +96,11 @@ do
     splitdir=$dstdir/filelist/split${nj}
     mkdir -p ${splitdir}/log
 
-    # Convert FLAC files to WAV.
-    if [ "$set" == train ]; then
-        python $deflac --srcdir $srcdir/train-clean-100 $srcdir/train-clean-360 $srcdir/train-other-500 --dstdir $dstdir/wav
-    else
-        python $deflac --srcdir $srcdir/${set}-clean --dstdir $dstdir/wav
-    fi
-
     # List the original wav files.
     if [ "$set" == train ]; then
-        python $gen_filelist --srcdir $dstdir/wav/train-clean-100 $dstdir/wav/train-clean-360 $dstdir/wav/train-other-500 --outlist $dstdir/filelist/${set}.list
+        python3 $gen_filelist --srcdir $srcdir/train-clean-100 $srcdir/train-clean-360 --outlist $dstdir/filelist/${set}.list
     else
-        python $gen_filelist --srcdir $dstdir/wav/${set}-clean --outlist $dstdir/filelist/${set}.list
+        python3 $gen_filelist --srcdir $srcdir/${set}-clean --outlist $dstdir/filelist/${set}.list
     fi        
 
     # Split trainlist for parallel processing

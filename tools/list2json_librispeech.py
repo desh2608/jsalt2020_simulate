@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import argparse, os, sys, re, json, wave
+import soundfile as sf
 from collections import OrderedDict
 
 
@@ -38,9 +39,9 @@ def main(args):
 
             spkrid = m.group(1) 
 
-            with wave.open(path) as wf:
-                nsamples = wf.getnframes()
-                sr = wf.getframerate()
+            with sf.SoundFile(path) as wf:
+                nsamples = wf.frames
+                sr = wf.samplerate
                 dur = nsamples / sr
                 
             # Generate segment info for the current file. 

@@ -3,6 +3,7 @@
 import argparse, sys, os, json, random
 from collections import OrderedDict
 import numpy as np
+import soundfile as sf
 
 # Add path to libaueffect and load the module.
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -48,7 +49,8 @@ def main(args):
                 x = []
                 for f in infiles:
                     try:
-                        _x, sr = libaueffect.read_wav(f, sample_rate=args.sample_rate, channel=0)
+                        # _x, sr = libaueffect.read_wav(f, sample_rate=args.sample_rate, channel=0)
+                        _x, sr = sf.read(f)
                     except RuntimeError:
                         print('Wav file is broken, skipped: {}'.format(f))
                         continue
